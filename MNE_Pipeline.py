@@ -53,7 +53,8 @@ class MNE_Repo_Mat:
 
     def construct_epoch_array(self, tmin, events = None):
         self.epochs = mne.EpochsArray(self.epochs_raw, info=self.info, tmin=tmin, events=events)
-        # self.event_ids = epochs.event_id
+        self.epochs.apply_baseline((None, 0))
+        self.event_ids = self.epochs.event_id
         return self.epochs
 
     def save_epochs(self, epochs):
@@ -72,6 +73,7 @@ class MNE_Repo_Mat:
 
     def construct_evoked_array(self, method):
         evoked = self.epochs.average(method=method)
+#         evoked.apply_baseline((None, 0))
         evoked.set_eeg_reference(projection=True)
         evoked.apply_proj()
         evoked.plot(spatial_colors=True,unit=False)
@@ -201,7 +203,8 @@ class MNE_Repo_Mat:
     def save_event_wise_source_estimates(self, stcs):
         for stc_sub in stcs:
             stc_sub_path = 'stcs/' + stc_sub
-            os.mkdir(stc_sub_path)
+            if not os.path.exists(stc_sub_path):
+                os.mkdir(stc_sub_path)
             for event_id in stcs[stc_sub]:
                 event_stc_path = stc_sub_path + '/' + event_id
                 stcs[stc_sub][event_id].save(fname = event_stc_path, ftype = 'stc')
