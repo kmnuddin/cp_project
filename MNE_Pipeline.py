@@ -26,12 +26,13 @@ class MNE_Repo_Mat:
     def construct_subject():
         MNE_Repo_Mat.subjects_dir = os.path.dirname(fetch_fsaverage())
         MNE_Repo_Mat.subject='fsaverage'
+        return MNE_Repo_Mat.subject
 
     @staticmethod
     def construct_montage(kind, path):
         montage = mne.channels.read_montage(kind=kind, path=path, unit='auto', transform=False)
-        montage.kind = '3d'
-        montage.plot()
+        # montage.kind = '3d'
+        # montage.plot()
         return montage
 
     def construct_info(self, montage = None, sfreq = 500):
