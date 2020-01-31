@@ -4,6 +4,12 @@ from scipy.io import loadmat
 import os
 from mne.datasets import fetch_fsaverage
 import re
+import cv2
+import matplotlib.pyplot as plt
+from matplotlib import cm
+from tqdm import tqdm
+from multiprocessing import Process
+from threading import Thread
 
 class MNE_Repo_Mat:
     subjects_dir = '';
@@ -20,6 +26,8 @@ class MNE_Repo_Mat:
         self.Fs = self.data_mat['Fs']
         self.NumChannels = self.data_mat['NumChannels']
         self.chanNames = self.data_mat['chanNames'].tolist()
+        self.__st_eeg = None
+        self.__band_powers = []
         return self.data_mat
 
     @staticmethod
@@ -182,6 +190,88 @@ class MNE_Repo_Mat:
         src = MNE_Repo_Mat.setup_src_space()
         bem = MNE_Repo_Mat.setup_bem()
         return montage, src, bem
+
+    def __construct_st_epoch_array(self, tmin=-0.2):
+        st_epoch = mne.EpochsArray(self.__st_eeg, info=self.info, tmin=tmin, verbose=False)
+        return st_epoch
+
+
+    def get_avg_band_power(self):
+        import itertools
+        folder_path = 'band_power_topomap_new/'
+        for i in tqdm(range(len(self.epochs_raw))):
+            self.__st_eeg = self.epochs_raw[i:i+1]
+
+            st_epoch = self.__construct_st_epoch_array(-0.2)
+
+            psd_alpha, _ = mne.time_frequency.psd_welch(st_epoch, 8, 15, n_fft=self.Fs, verbose=False)
+            psd_beta, _ = mne.time_frequency.psd_welch(st_epoch, 16, 31, n_fft=self.Fs, verbose=False)
+            psd_gamma, _ = mne.time_frequency.psd_welch(st_epoch, 32, 60, n_fft=self.Fs, verbose=False)
+
+            band_pow_alpha = np.average(psd_alpha, axis=2).flatten()
+            band_pow_beta = np.average(psd_beta, axis=2).flatten()
+            band_pow_gamma = np.average(psd_gamma, axis=2).flatten()
+
+            band_pows_st = [band_pow_alpha, band_pow_beta, band_pow_gamma]
+            band_pows_st = list(itertools.chain(*band_pows_st))
+
+            self.__band_powers.append(band_pows_st)
+
+        return np.array(self.__band_powers)
+
+    def plot_topomap_avg_bp(self, start, end, subject, avg_power_st_slice):
+        folder_path = 'band_power_topomap_new/'
+        subject_path = folder_path + subject
+        alpha_path = subject_path + '/alpha'
+        beta_path = subject_path + '/beta'
+        gamma_path = subject_path + '/gamma'
+        combined_path = subject_path + '/combined'
+
+        if not os.path.exists(subject_path):
+            os.mkdir(subject_path)
+        if not os.path.exists(alpha_path):
+            os.mkdir(alpha_path)
+        if not os.path.exists(beta_path):
+            os.mkdir(beta_path)
+        if not os.path.exists(gamma_path):
+            os.mkdir(gamma_path)
+
+        for i, trial in tqdm(zip(range(start, end), avg_power_st_slice)):
+            alpha = trial[0:64]
+            beta = trial[64:128]
+            gamma = trial[128:192]
+
+            img_path_alpha = alpha_path +  '/trial_' + str(i+1) + '.png'
+            img_path_beta = beta_path  +  '/trial_' + str(i+1) + '.png'
+            img_path_gamma = gamma_path +  '/trial_' + str(i+1) + '.png'
+
+            topo_alpha, _ = mne.viz.plot_topomap(alpha, self.info, res=256, show=False, contours=0, cmap=cm.gray_r)
+            topo_alpha.get_figure().savefig(img_path_alpha, dpi=64)
+
+            topo_beta, _ = mne.viz.plot_topomap(beta, self.info, res=256, show=False, contours=0, cmap=cm.gray_r)
+            topo_beta.get_figure().savefig(img_path_beta, dpi=64)
+
+            topo_gamma, _ = mne.viz.plot_topomap(gamma, self.info, res=256, show=False, contours=0, cmap=cm.gray_r)
+            topo_gamma.get_figure().savefig(img_path_gamma, dpi=64)
+
+    def async_save_band_power_topo_for_st(self, subject, avg_power_st):
+        n = list(range(0, len(avg_power_st), 50))
+        n.append(len(avg_power_st))
+
+        if len(avg_power_st) % 50 != 0:
+            n.append(len(avg_power_st))
+
+        processes = []
+        for i in range(len(n) - 1):
+            process = Process(target=self.plot_topomap_avg_bp, args=(n[i], n[i+1], subject, avg_power_st[n[i]:n[i+1]]), name='Process s_{} n_{}'.format(subject, i))
+            processes.append(process)
+            process.start()
+
+        for process in processes:
+            process.join()
+
+
+
 
     def generate_source_estimate_straight(self, file_name, montage, src, bem):
         self.load_data(file_name)
