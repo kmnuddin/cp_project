@@ -219,6 +219,32 @@ class MNE_Repo_Mat:
 
         return np.array(self.__band_powers)
 
+    def plot_combine_topomaps(self, start, end, subject):
+        folder_path = 'band_power_topomap_new/'
+        subject_path = folder_path + subject
+        alpha_path = subject_path + '/alpha'
+        beta_path = subject_path + '/beta'
+        gamma_path = subject_path + '/gamma'
+        combined_path = subject_path + '/combined'
+
+        if not os.path.exists(combined_path):
+            os.mkdir(combined_path)
+
+        for i in tqdm(range(start, end)):
+            img_path_alpha = alpha_path +  '/trial_' + str(i+1) + '.png'
+            img_path_beta = beta_path  +  '/trial_' + str(i+1) + '.png'
+            img_path_gamma = gamma_path +  '/trial_' + str(i+1) + '.png'
+
+            alpha = cv2.imread(img_path_alpha, cv2.IMREAD_GRAYSCALE)
+            beta = cv2.imread(img_path_beta, cv2.IMREAD_GRAYSCALE)
+            gamma = cv2.imread(img_path_gamma, cv2.IMREAD_GRAYSCALE)
+
+            c_img = np.dstack((alpha, beta, gamma))
+
+            img_path = combined_path + '/trial_' + str(i+1) + '.png'
+
+            cv2.imwrite(img_path, c_img)
+
     def plot_topomap_avg_bp(self, start, end, subject, avg_power_st_slice):
         folder_path = 'band_power_topomap_new/'
         subject_path = folder_path + subject
@@ -258,9 +284,6 @@ class MNE_Repo_Mat:
         n = list(range(0, len(avg_power_st), 50))
         n.append(len(avg_power_st))
 
-        if len(avg_power_st) % 50 != 0:
-            n.append(len(avg_power_st))
-
         processes = []
         for i in range(len(n) - 1):
             process = Process(target=self.plot_topomap_avg_bp, args=(n[i], n[i+1], subject, avg_power_st[n[i]:n[i+1]]), name='Process s_{} n_{}'.format(subject, i))
@@ -269,6 +292,93 @@ class MNE_Repo_Mat:
 
         for process in processes:
             process.join()
+
+    def async_save_combined_topomap(self, subject, no_of_trials):
+        n = list(range(0, no_of_trials, 50))
+        n.append(no_of_trials)
+
+        processes = []
+
+        for i in range(len(n) - 1):
+            process = Process(target=self.plot_combine_topomaps, args=(n[i], n[i+1], subject), name='Process c_{} n_{}'.format(subject, i))
+            processes.append(process)
+            process.start()
+
+        for process in processes:
+            process.join()
+
+
+
+    def train_test_spliter_ML(self, subjects, label_mappers,labels = [1,2,3,4,5], folder_path='band_power_topomap_new', data_path='combined', save_path='data', validation=True):
+        train_path = save_path + '/' + 'train'
+        test_path = save_path + '/' + 'test'
+        validation_path = save_path + '/' + 'validation'
+
+        if not os.path.exists(save_path):
+            os.mkdir(save_path)
+            os.mkdir(train_path)
+            os.mkdir(test_path)
+            os.mkdir(validation_path)
+            for label in labels:
+                os.mkdir(train_path + '/' + str(label))
+                os.mkdir(test_path + '/' + str(label))
+                os.mkdir(validation_path + '/' + str(label))
+
+        if data_path is None:
+            return 'Cannot do with data_path None'
+
+        for subject in tqdm(subjects):
+            d_path = folder_path + '/' + subject + '/' + data_path
+            trials = np.array(os.listdir(d_path))
+            n_trials = len(trials)
+            test_indexes = []
+            validation_indexes = []
+
+            test_indexes = np.random.randint(0, n_trials, int(n_trials * 0.20))
+            validation_indexes = np.random.randint(0, n_trials, int(n_trials * 0.1))
+            in_sects = np.intersect1d(test_indexes, validation_indexes)
+
+
+            test_imgs = trials[test_indexes]
+            validation_imgs = trials[validation_indexes]
+
+            test_lbls = label_mappers[subject][test_indexes]
+            validation_lbls = label_mappers[subject][validation_indexes]
+
+            training_imgs = np.delete(trials, test_indexes.extend(validation_indexes))
+            training_lbls = np.delete(label_mappers[subject], test_indexes.extend(validation_indexes))
+
+            tr_process = Process(target=save, args=(subject, training_imgs, training_lbls, d_path, train_path), name='process training {}'.format(subject))
+            ts_process = Process(target=save, args=(subject, test_imgs, test_lbls, d_path, test_path), name='process test {}'.format(subject))
+            va_process = Process(target=save, args=(subject, validation_imgs, validation_lbls, d_path, train_path), name='process validation {}'.format(subject))
+
+            tr_process.start()
+            ts_process.start()
+            va_process.start()
+
+            tr_process.join()
+            ts_process.join()
+            va_process.join()
+
+
+        def save(self, subject, img_names, labels, dir, save_dir):
+            print('running')
+            for img_name, lbl in zip(img_names, labels):
+                load_path = dir + '/' + img_name
+                img = cv2.imread(load_path)
+                save_path = save_dir + '/' + str(lbl) + '/' + img
+                cv2.imwrite(save_path)
+
+
+
+
+
+
+
+
+
+
+
 
 
 
