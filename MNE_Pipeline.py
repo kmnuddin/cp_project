@@ -10,6 +10,7 @@ from matplotlib import cm
 from tqdm import tqdm
 from multiprocessing import Process
 from threading import Thread
+import random
 
 class MNE_Repo_Mat:
     subjects_dir = '';
@@ -309,7 +310,25 @@ class MNE_Repo_Mat:
 
 
 
-    def train_test_spliter_ML(self, subjects, label_mappers,labels = [1,2,3,4,5], folder_path='band_power_topomap_new', data_path='combined', save_path='data', validation=True):
+    def train_test_spliter_ML(self, subjects, label_mappers, labels = [1,2,3,4,5], folder_path='band_power_topomap_new', data_path='combined', save_path='data'):
+
+        def save(subject, img_names, labels, dir, save_dir):
+            for img_name, lbl in zip(img_names, labels):
+                load_path = dir + '/' + img_name
+                img = cv2.imread(load_path)
+                save_path = save_dir + '/' + str(lbl) + '/' + subject + '_' + img_name
+                cv2.imwrite(save_path, img)
+
+        def get_indexes_val_test(indexes, n_trials, sub_labels, labels, split_ratio=0.2):
+            indices = []
+            split_ratio = split_ratio / len(labels)
+            for lbl in labels:
+                lbl_indices = [i for i in indexes if sub_labels[i] == lbl]
+                r_index = random.sample(lbl_indices, ceil(n_trials * split_ratio))
+                indices.extend(r_index)
+            return indices
+
+
         train_path = save_path + '/' + 'train'
         test_path = save_path + '/' + 'test'
         validation_path = save_path + '/' + 'validation'
@@ -331,26 +350,28 @@ class MNE_Repo_Mat:
             d_path = folder_path + '/' + subject + '/' + data_path
             trials = np.array(os.listdir(d_path))
             n_trials = len(trials)
-            test_indexes = []
-            validation_indexes = []
 
-            test_indexes = np.random.randint(0, n_trials, int(n_trials * 0.20))
-            validation_indexes = np.random.randint(0, n_trials, int(n_trials * 0.1))
-            in_sects = np.intersect1d(test_indexes, validation_indexes)
+            trial_indexes = list(range(0, n_trials))
 
-
+            test_indexes = get_indexes_val_test(trial_indexes, n_trials, label_mappers[subject], labels)
+            print(len(test_indexes))
+            temp = np.delete(trial_indexes, test_indexes).tolist()
+            validation_indexes = get_indexes_val_test(temp, n_trials, label_mappers[subject], labels, split_ratio=0.1)
+            print(len(validation_indexes))
             test_imgs = trials[test_indexes]
             validation_imgs = trials[validation_indexes]
 
             test_lbls = label_mappers[subject][test_indexes]
             validation_lbls = label_mappers[subject][validation_indexes]
 
-            training_imgs = np.delete(trials, test_indexes.extend(validation_indexes))
-            training_lbls = np.delete(label_mappers[subject], test_indexes.extend(validation_indexes))
+            test_val_indexes = test_indexes
+            test_val_indexes.extend(validation_indexes)
+            training_imgs = np.delete(trials, test_val_indexes)
+            training_lbls = np.delete(label_mappers[subject], test_val_indexes)
 
             tr_process = Process(target=save, args=(subject, training_imgs, training_lbls, d_path, train_path), name='process training {}'.format(subject))
             ts_process = Process(target=save, args=(subject, test_imgs, test_lbls, d_path, test_path), name='process test {}'.format(subject))
-            va_process = Process(target=save, args=(subject, validation_imgs, validation_lbls, d_path, train_path), name='process validation {}'.format(subject))
+            va_process = Process(target=save, args=(subject, validation_imgs, validation_lbls, d_path, validation_path), name='process validation {}'.format(subject))
 
             tr_process.start()
             ts_process.start()
@@ -359,26 +380,6 @@ class MNE_Repo_Mat:
             tr_process.join()
             ts_process.join()
             va_process.join()
-
-
-        def save(self, subject, img_names, labels, dir, save_dir):
-            print('running')
-            for img_name, lbl in zip(img_names, labels):
-                load_path = dir + '/' + img_name
-                img = cv2.imread(load_path)
-                save_path = save_dir + '/' + str(lbl) + '/' + img
-                cv2.imwrite(save_path)
-
-
-
-
-
-
-
-
-
-
-
 
 
 
