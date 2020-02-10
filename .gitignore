@@ -14,5 +14,6 @@ plot_mne_inverse_label_connectivity.ipynb
 *.elp
 __pycache__
 DynamicConnectivity
+bootstrap_erps
 
 

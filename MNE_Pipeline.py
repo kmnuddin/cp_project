@@ -73,7 +73,7 @@ class MNE_Repo_Mat:
             epochs[key].save(epoch_path_to_save, overwrite=True)
 
     def load_epochs(self, path):
-        self.epochs = mne.read_epochs(path)
+        self.epochs = mne.read_epochs(path, verbose=0)
         return self.epochs
 
     # def get_trigger_wise_epochs(self, epochs, event, event_ids):
@@ -196,7 +196,6 @@ class MNE_Repo_Mat:
         st_epoch = mne.EpochsArray(self.__st_eeg, info=self.info, tmin=tmin, verbose=False)
         return st_epoch
 
-
     def get_avg_band_power(self):
         import itertools
         folder_path = 'band_power_topomap_new/'
@@ -221,7 +220,7 @@ class MNE_Repo_Mat:
         return np.array(self.__band_powers)
 
     def plot_combine_topomaps(self, start, end, subject):
-        folder_path = 'band_power_topomap_new/'
+        folder_path = 'band_power_topomap_BTS/'
         subject_path = folder_path + subject
         alpha_path = subject_path + '/alpha'
         beta_path = subject_path + '/beta'
@@ -247,7 +246,7 @@ class MNE_Repo_Mat:
             cv2.imwrite(img_path, c_img)
 
     def plot_topomap_avg_bp(self, start, end, subject, avg_power_st_slice):
-        folder_path = 'band_power_topomap_new/'
+        folder_path = 'band_power_topomap_BTS/'
         subject_path = folder_path + subject
         alpha_path = subject_path + '/alpha'
         beta_path = subject_path + '/beta'
