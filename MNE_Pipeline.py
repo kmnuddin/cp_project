@@ -69,7 +69,7 @@ class MNE_Repo_Mat:
 
     def save_epochs(self, epochs):
         for key in epochs:
-            epoch_path_to_save = 'epochs/' + key  + '.fif'
+            epoch_path_to_save = 'combined_epochs/' + key  + '.fif'
             epochs[key].save(epoch_path_to_save, overwrite=True)
 
     def load_epochs(self, path):
@@ -432,9 +432,10 @@ class MNE_Repo_Mat:
             epoch_subject_key = re.split(r'[./]', filename)[1] + '_epoch'
 
             events = self.construct_events(self.trigs)
+            m_events = mne.merge_events(events, [1,5], 15)
 
             if gen_mode:
-                self.epochs_dict[epoch_subject_key]  = self.construct_epoch_array(-0.2, events)
+                self.epochs_dict[epoch_subject_key]  = self.construct_epoch_array(-0.2, m_events)
                 self.evokeds[erp_subject_key] = self.construct_trigger_wise_evoked_array(self.epochs_dict[epoch_subject_key], self.epochs_dict[epoch_subject_key].event_id, 'mean')
             else:
                 epoch_path = 'epochs/' + epoch_subject_key + '.fif'
