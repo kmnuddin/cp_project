@@ -43,6 +43,8 @@ class MNE_Repo_Mat_ext(MNE_Repo_Mat):
         dict_holder[event_id] = bst_sample
 
     def async_bootstrap_epochs_with_RT(self, subject, epochs, RT_dict, sampling_rate=10, iterations=300):
+        ## Need re-implementation
+        
         import pickle
         save_path = 'bootstrap_erps/'
         subject_save_path = save_path + subject
@@ -60,7 +62,7 @@ class MNE_Repo_Mat_ext(MNE_Repo_Mat):
 
         processes = []
         for event in epochs.event_id:
-            if event != '15' or event != '3':
+            if event != '15' and event != '3':
                 continue
             epoch = epochs[event].get_data()
             RT = RT_dict[event]

@@ -11,13 +11,18 @@ from tqdm import tqdm
 from multiprocessing import Process
 from threading import Thread
 import random
+from math import ceil
 
 class MNE_Repo_Mat:
     subjects_dir = '';
     subject = '';
     bem_sol = mne.bem.ConductorModel()
 
-    def load_data(self, filename):
+    def __init__(self):
+        self.__st_eeg = None
+        self.__band_powers = []
+
+    def load_data_mat(self, filename):
         self.data_mat = loadmat(filename, squeeze_me=True, struct_as_record=False)
         self.behavResp = self.data_mat['behavResp']
         self.RT = self.data_mat['RT']
@@ -27,8 +32,6 @@ class MNE_Repo_Mat:
         self.Fs = self.data_mat['Fs']
         self.NumChannels = self.data_mat['NumChannels']
         self.chanNames = self.data_mat['chanNames'].tolist()
-        self.__st_eeg = None
-        self.__band_powers = []
         return self.data_mat
 
     @staticmethod
@@ -198,8 +201,8 @@ class MNE_Repo_Mat:
 
     def get_avg_band_power(self):
         import itertools
-        folder_path = 'band_power_topomap_new/'
-        for i in tqdm(range(len(self.epochs_raw))):
+        band_powers = []
+        for i in range(len(self.epochs_raw)):
             self.__st_eeg = self.epochs_raw[i:i+1]
 
             st_epoch = self.__construct_st_epoch_array(-0.2)
@@ -215,9 +218,9 @@ class MNE_Repo_Mat:
             band_pows_st = [band_pow_alpha, band_pow_beta, band_pow_gamma]
             band_pows_st = list(itertools.chain(*band_pows_st))
 
-            self.__band_powers.append(band_pows_st)
+            band_powers.append(band_pows_st)
 
-        return np.array(self.__band_powers)
+        return np.array(band_powers)
 
     def plot_combine_topomaps(self, start, end, subject):
         folder_path = 'band_power_topomap_BTS/'
@@ -230,7 +233,7 @@ class MNE_Repo_Mat:
         if not os.path.exists(combined_path):
             os.mkdir(combined_path)
 
-        for i in tqdm(range(start, end)):
+        for i in range(start, end):
             img_path_alpha = alpha_path +  '/trial_' + str(i+1) + '.png'
             img_path_beta = beta_path  +  '/trial_' + str(i+1) + '.png'
             img_path_gamma = gamma_path +  '/trial_' + str(i+1) + '.png'
@@ -262,7 +265,7 @@ class MNE_Repo_Mat:
         if not os.path.exists(gamma_path):
             os.mkdir(gamma_path)
 
-        for i, trial in tqdm(zip(range(start, end), avg_power_st_slice)):
+        for i, trial in zip(range(start, end), avg_power_st_slice):
             alpha = trial[0:64]
             beta = trial[64:128]
             gamma = trial[128:192]
@@ -280,7 +283,7 @@ class MNE_Repo_Mat:
             topo_gamma, _ = mne.viz.plot_topomap(gamma, self.info, res=256, show=False, contours=0, cmap=cm.gray_r)
             topo_gamma.get_figure().savefig(img_path_gamma, dpi=64)
 
-    def async_save_band_power_topo_for_st(self, subject, avg_power_st):
+    def async_save_band_power_topo(self, subject, avg_power_st):
         n = list(range(0, len(avg_power_st), 50))
         n.append(len(avg_power_st))
 
